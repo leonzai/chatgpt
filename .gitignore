@@ -1,0 +1,6 @@
+.env
+tmp
+chatgpt
+.idea
+go.sum
+upload.sh

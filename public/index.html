@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, user-scalable=no">
+    <title>ChatGPT</title>
+    <script src="cdnjs.cloudflare.com_ajax_libs_vue_3.3.4_vue.global.min.js"></script>
+    <script src="cdn.jsdelivr.net_npm_marked_marked.min.js"></script>
+    <style>
+        .system {
+            font-size: 20px;
+            margin: 15px 0;
+        }
+
+        .user {
+            background: pink;
+            color: #525252;
+            padding: 8px 12px;
+            font-family: system-ui;
+            border-radius: 5px;
+        }
+
+        .assistant {
+            background: #7cb4cf;
+            color: white;
+            padding: 8px 12px;
+            font-family: system-ui;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            font-size: 20px;
+            letter-spacing: 10px;
+            border-radius: 5px;
+            color: white;
+            background: #2871f3;
+            border: none;
+        }
+
+        pre {
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+
+        .typing {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app" style="margin: 0 auto;max-width: 880px;">
+    <div v-for="chat in chats">
+        <div :class="chat.role" v-html="format(chat.content)"></div>
+<!--        <div :class="chat.role" v-html="chat.content"></div>-->
+    </div>
+    <div class="assistant" v-if="thinking">思考中...</div>
+    <div style="margin-top: 20px">
+        <textarea class="typing" rows="10" v-model="message" @keyup.enter.native="chat"></textarea>
+        <button @click="chat" style="margin-top: 10px">发送</button>
+    </div>
+</div>
+
+<script>
+    const {createApp} = Vue
+
+    createApp({
+        data() {
+            return {
+                message: "",
+                uid: "",
+                chats: [],
+                thinking: false,
+                marked: null,
+            }
+        },
+        created() {
+            marked.use({mangle: false,headerIds: false})
+            this.marked = marked
+
+            // 生成 uid
+            this.uid = localStorage.getItem("uid")
+            if (!this.uid) {
+                this.uid = Math.random().toString()
+                localStorage.setItem("uid", this.uid)
+            }
+
+            // 生成 prompt
+            if (!this.chats.length) {
+                this.chats.push({role: "system", content: "You are an AI assistant that helps people."});
+            }
+
+            // 验证密码
+            let password = localStorage.getItem("password")
+            if (!password) {
+                while (!(password = prompt("请输入密码："))) {
+                }
+            }
+
+            const formData = new FormData();
+            formData.append('PASSWORD', password);
+            fetch('/login', {method: 'POST', body: formData})
+                .then(response => {
+                    return response.json()
+                }).then(res => {
+                if (res.type !== "success") {
+                    localStorage.removeItem("password")
+                    location.reload();
+                    return
+                }
+                localStorage.setItem("password", password)
+            });
+        },
+
+        methods: {
+            format(content) {
+                return  content.indexOf('```')!==-1? this.marked.parse(content): marked.parse('```html\n'+content+'\n```')
+            },
+            postChats() {
+                let chats= []
+                for (let i in this.chats) {
+                    if (this.chats[i].role === "user") {
+                        chats.push(this.chats[i])
+                    }
+                }
+                return chats.slice(-3)
+            },
+
+            chat(event) {
+                if (event.shiftKey) {
+                    return
+                }
+                let password = localStorage.getItem("password")
+                this.chats.push({role: "user", content: this.message});
+                const formData = new FormData();
+
+                formData.append('ask', JSON.stringify(this.postChats()));
+                formData.append('PASSWORD', password);
+                formData.append('user', this.uid);
+
+                this.message = ""
+                this.thinking = true
+                fetch('/chat', {method: 'POST', body: formData})
+                    .then(response => {
+                        this.thinking = false
+                        return response.json()
+                    }).then(res => {
+                    // let message = res.message.replaceAll('<?', '&lt;').replaceAll('?>', '&gt;')
+                    // this.chats.push({role: "assistant", content: message});
+                    if (res.type==="error") {
+                        alert("报错了，请截图给 CEO Leon \n" + res.message);
+                        return
+                    }
+                    this.chats.push({role: "assistant", content: res.message});
+                });
+            },
+        }
+    }).mount('#app')
+</script>
+</body>
+</html>
