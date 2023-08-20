@@ -39,13 +39,12 @@ func main() {
 
 		ask := c.PostForm("ask")
 		user := c.PostForm("user")
-		completionUrl := viper.GetString("ENDPOINT")
 		client := &http.Client{
-			Timeout: time.Second * 20,
+			Timeout: time.Second * 60,
 		}
 		reqData := `{"temperature": 0, "user": "` + base64.StdEncoding.EncodeToString([]byte(user)) + `", "messages":` + ask + `}`
 		fmt.Println(reqData)
-		req, err := http.NewRequest("POST", completionUrl, strings.NewReader(reqData))
+		req, err := http.NewRequest("POST", viper.GetString("ENDPOINT"), strings.NewReader(reqData))
 		if err != nil {
 			Error(c, "生成请求失败："+err.Error())
 			return
